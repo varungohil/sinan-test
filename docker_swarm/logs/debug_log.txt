@@ -1,0 +1,2 @@
+2024-12-13 03:40:36 INFO: node0.nevenas-236518.hwswcodesign-pg0.utah.cloudlab.us connected
+2024-12-13 03:40:36 INFO: node1.nevenas-236518.hwswcodesign-pg0.utah.cloudlab.us connected
