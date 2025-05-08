@@ -227,7 +227,7 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
             layer_outputs = target_module.get_outputs()
             target_output = layer_outputs[0]  # The first output is the main output
             
-            # Compute loss to maximize the mean activation
+            # Compute loss to maximize the mean activation of the target layer
             loss_val = -mx.nd.mean(target_output)
         
         # Backward pass
