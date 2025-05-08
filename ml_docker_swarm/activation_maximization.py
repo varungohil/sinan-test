@@ -201,9 +201,14 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     iterations = []
     losses = []
     
+    # Create a new symbol that includes all three inputs
+    data1_sym = mx.sym.Variable('data1')
+    data2_sym = mx.sym.Variable('data2')
+    data3_sym = mx.sym.Variable('data3')
+    
     # Create a new module for the target layer
     target_module = mx.mod.Module(
-        symbol=layer_output,
+        symbol=loss,
         context=ctx,
         data_names=['data1', 'data2', 'data3'],
         label_names=None
