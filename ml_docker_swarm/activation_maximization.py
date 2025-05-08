@@ -201,13 +201,30 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     iterations = []
     losses = []
     
+    # Create a new module for the target layer
+    target_module = mx.mod.Module(
+        symbol=layer_output,
+        context=ctx,
+        data_names=['data1', 'data2', 'data3'],
+        label_names=None
+    )
+    
+    # Bind the module with the input shapes
+    target_module.bind(
+        data_shapes=[
+            ('data1', (1, 6, 28, 5)),
+            ('data2', (1, 5, 5)),
+            ('data3', (1, 28))
+        ],
+        for_training=True
+    )
+    
     # Maximize activation
     for i in range(num_iterations):
         with mx.autograd.record():
-            # Forward pass
-            model.forward(mx.io.DataBatch([data1, data2, data3]))
-            # Get the output of the target layer
-            layer_output = model.get_outputs()[0]
+            # Forward pass through the target layer
+            target_module.forward(mx.io.DataBatch([data1, data2, data3]))
+            layer_output = target_module.get_outputs()[0]
             loss_val = -mx.nd.mean(layer_output)
         
         loss_val.backward()
