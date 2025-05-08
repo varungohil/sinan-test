@@ -119,8 +119,33 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     else:
         ctx = devs    # CPU case
     
-    input_data = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
-    input_data.attach_grad()
+    # Initialize all three inputs with appropriate shapes
+    if 'convolution' in layer_name or 'fullyconnected0' in layer_name:
+        # System data branch
+        data1 = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
+        data2 = mx.nd.zeros((1, 5, 5), ctx=ctx)  # Latency data
+        data3 = mx.nd.zeros((1, 28), ctx=ctx)    # Next config data
+    elif 'fullyconnected1' in layer_name:
+        # Latency data branch
+        data1 = mx.nd.zeros((1, 6, 28, 5), ctx=ctx)  # System data
+        data2 = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
+        data3 = mx.nd.zeros((1, 28), ctx=ctx)    # Next config data
+    else:
+        # Next config or combined branches
+        data1 = mx.nd.zeros((1, 6, 28, 5), ctx=ctx)  # System data
+        data2 = mx.nd.zeros((1, 5, 5), ctx=ctx)      # Latency data
+        data3 = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
+    
+    # Attach gradients to the input we're optimizing
+    if 'convolution' in layer_name or 'fullyconnected0' in layer_name:
+        data1.attach_grad()
+        input_data = data1
+    elif 'fullyconnected1' in layer_name:
+        data2.attach_grad()
+        input_data = data2
+    else:
+        data3.attach_grad()
+        input_data = data3
     
     # Get the symbol from the model
     sym = model.symbol
@@ -179,20 +204,20 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     # Maximize activation
     for i in range(num_iterations):
         with mx.autograd.record():
-            output = model.forward(mx.io.DataBatch([input_data]))
+            output = model.forward(mx.io.DataBatch([data1, data2, data3]))
             loss_val = -mx.nd.mean(output[0])
         
         loss_val.backward()
         updater(0, input_data.grad, input_data)
         
         # Apply constraints based on input type
-        if 'sys_conv' in layer_name:
+        if 'convolution' in layer_name or 'fullyconnected0' in layer_name:
             # System data constraints
             input_data = mx.nd.array(clip_system_data(input_data.asnumpy()), ctx=ctx)
-        elif 'lat_fc' in layer_name:
+        elif 'fullyconnected1' in layer_name:
             # Latency data constraints
             input_data = mx.nd.array(clip_latency_data(input_data.asnumpy()), ctx=ctx)
-        elif 'nxt_fc' in layer_name:
+        else:
             # Next config constraints
             input_data = mx.nd.array(clip_next_config(input_data.asnumpy()), ctx=ctx)
         
