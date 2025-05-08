@@ -188,9 +188,12 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
             else:
                 raise ValueError(f"Could not find layer {layer_name} or any alternatives")
     
+    # Create a new symbol that includes both the model's output and the target layer's output
+    target_sym = mx.sym.Group([sym, layer_output])
+    
     # Create a new module for the target layer using the model's symbol
     target_module = mx.mod.Module(
-        symbol=sym,  # Use the model's symbol
+        symbol=target_sym,  # Use the combined symbol
         context=ctx,
         data_names=['data1', 'data2', 'data3'],
         label_names=None
@@ -224,8 +227,9 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
             target_module.forward(mx.io.DataBatch([data1, data2, data3]))
             
             # Get the output of the specific layer we want to maximize
+            # The second output (index 1) is our target layer's output
             layer_outputs = target_module.get_outputs()
-            target_output = layer_outputs[0]  # The first output is the main output
+            target_output = layer_outputs[1]  # The second output is our target layer
             
             # Compute loss to maximize the mean activation of the target layer
             loss_val = -mx.nd.mean(target_output)
