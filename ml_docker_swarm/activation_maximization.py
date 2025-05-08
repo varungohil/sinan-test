@@ -126,13 +126,42 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     sym = model.symbol
     all_layers = sym.get_internals()
     
+    # Print all available layer names for debugging
+    print("\nAvailable layer names:")
+    for name in all_layers.list_outputs():
+        print(f"  - {name}")
+    print()
+    
     # For ReLU layers, we want to maximize the pre-activation (before ReLU)
     if 'act' in layer_name:
         # Get the layer name before activation (e.g., 'sys_bn1' from 'sys_act1')
         pre_act_name = layer_name.replace('act', 'bn')
-        layer_output = all_layers[pre_act_name]
+        try:
+            layer_output = all_layers[pre_act_name]
+        except ValueError:
+            print(f"Warning: Could not find layer {pre_act_name}, trying {layer_name}")
+            layer_output = all_layers[layer_name]
     else:
-        layer_output = all_layers[layer_name]
+        try:
+            layer_output = all_layers[layer_name]
+        except ValueError:
+            # Try alternative naming patterns
+            alt_names = [
+                f"{layer_name}_output",
+                f"{layer_name}_fwd",
+                f"{layer_name}_0",
+                layer_name.replace('conv', 'convolution'),
+                layer_name.replace('fc', 'fullyconnected')
+            ]
+            for alt_name in alt_names:
+                try:
+                    layer_output = all_layers[alt_name]
+                    print(f"Found layer with alternative name: {alt_name}")
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError(f"Could not find layer {layer_name} or any alternatives")
     
     # Create a loss function that maximizes the mean activation
     # For ReLU layers, we want to maximize the pre-activation values
