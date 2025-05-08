@@ -9,7 +9,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model-prefix', dest='model_prefix', type=str, default='./model/cnv')
     parser.add_argument('--load-epoch', dest='load_epoch', type=int, default=200)
-    parser.add_argument('--gpus', type=str, default='0', help='the gpus will be used, e.g "0,1,2,3"')
+    parser.add_argument('--gpus', type=str, default=None, help='the gpus will be used, e.g "0,1,2,3"')
     parser.add_argument('--kv-store', type=str, default='local', help='the kvstore type')
     parser.add_argument('--output-dir', type=str, default='./activation_maps', help='directory to save activation maps')
     parser.add_argument('--num-iterations', type=int, default=100, help='number of iterations for activation maximization')
@@ -113,7 +113,13 @@ def clip_next_config(data):
 
 def maximize_activation(model, layer_name, input_shape, num_iterations, learning_rate, devs):
     # Initialize random input
-    input_data = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=devs[0])
+    # Handle both CPU and GPU contexts
+    if isinstance(devs, list):
+        ctx = devs[0]  # GPU case
+    else:
+        ctx = devs    # CPU case
+    
+    input_data = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
     input_data.attach_grad()
     
     # Get both the pre-activation and post-activation outputs
@@ -152,13 +158,13 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
         # Apply constraints based on input type
         if 'sys_conv' in layer_name:
             # System data constraints
-            input_data = mx.nd.array(clip_system_data(input_data.asnumpy()), ctx=devs[0])
+            input_data = mx.nd.array(clip_system_data(input_data.asnumpy()), ctx=ctx)
         elif 'lat_fc' in layer_name:
             # Latency data constraints
-            input_data = mx.nd.array(clip_latency_data(input_data.asnumpy()), ctx=devs[0])
+            input_data = mx.nd.array(clip_latency_data(input_data.asnumpy()), ctx=ctx)
         elif 'nxt_fc' in layer_name:
             # Next config constraints
-            input_data = mx.nd.array(clip_next_config(input_data.asnumpy()), ctx=devs[0])
+            input_data = mx.nd.array(clip_next_config(input_data.asnumpy()), ctx=ctx)
         
         # Store iteration and loss
         iterations.append(i)
