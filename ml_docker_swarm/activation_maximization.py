@@ -188,17 +188,6 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
             else:
                 raise ValueError(f"Could not find layer {layer_name} or any alternatives")
     
-    # Create a loss function that maximizes the mean activation
-    loss = -mx.sym.mean(layer_output)
-    
-    # Create an optimizer
-    optimizer = mx.optimizer.SGD(learning_rate=learning_rate)
-    updater = mx.optimizer.get_updater(optimizer)
-    
-    # Initialize lists to store iteration and loss values
-    iterations = []
-    losses = []
-    
     # Create a new module for the target layer using the model's symbol
     target_module = mx.mod.Module(
         symbol=sym,  # Use the model's symbol
@@ -220,15 +209,31 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     # Copy parameters from the original model
     target_module.set_params(*model.get_params())
     
+    # Create an optimizer
+    optimizer = mx.optimizer.SGD(learning_rate=learning_rate)
+    updater = mx.optimizer.get_updater(optimizer)
+    
+    # Initialize lists to store iteration and loss values
+    iterations = []
+    losses = []
+    
     # Maximize activation
     for i in range(num_iterations):
         with mx.autograd.record():
             # Forward pass through the target layer
             target_module.forward(mx.io.DataBatch([data1, data2, data3]))
-            layer_output = target_module.get_outputs()[0]
-            loss_val = -mx.nd.mean(layer_output)
+            
+            # Get the output of the specific layer we want to maximize
+            layer_outputs = target_module.get_outputs()
+            target_output = layer_outputs[0]  # The first output is the main output
+            
+            # Compute loss to maximize the mean activation
+            loss_val = -mx.nd.mean(target_output)
         
+        # Backward pass
         loss_val.backward()
+        
+        # Update the input data
         updater(0, input_data.grad, input_data)
         
         # Apply constraints based on input type
