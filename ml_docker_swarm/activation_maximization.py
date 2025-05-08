@@ -204,8 +204,11 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     # Maximize activation
     for i in range(num_iterations):
         with mx.autograd.record():
-            output = model.forward(mx.io.DataBatch([data1, data2, data3]))
-            loss_val = -mx.nd.mean(output[0])
+            # Forward pass
+            model.forward(mx.io.DataBatch([data1, data2, data3]))
+            # Get the output of the target layer
+            layer_output = model.get_outputs()[0]
+            loss_val = -mx.nd.mean(layer_output)
         
         loss_val.backward()
         updater(0, input_data.grad, input_data)
