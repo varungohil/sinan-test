@@ -28,18 +28,31 @@ def load_model(args):
     model = all_layers['latency_output']
     internal_state = all_layers['full_feature_output']
     
+    # Create modules with proper data shapes
+    data_shapes = [
+        ('data1', (1, 6, 28, 5)),  # System data
+        ('data2', (1, 5, 5)),      # Latency data
+        ('data3', (1, 28))         # Next config data
+    ]
+    
     # Create modules
     model = mx.mod.Module(
         context=devs,
         symbol=model,
-        data_names=('data1', 'data2', 'data3')
+        data_names=['data1', 'data2', 'data3'],
+        label_names=None  # No labels needed for activation maximization
     )
     
     internal_state = mx.mod.Module(
         context=devs,
         symbol=internal_state,
-        data_names=('data1', 'data2', 'data3')
+        data_names=['data1', 'data2', 'data3'],
+        label_names=None
     )
+    
+    # Initialize the modules
+    model.bind(data_shapes=data_shapes, for_training=False)
+    internal_state.bind(data_shapes=data_shapes, for_training=False)
     
     # Load parameters
     _, arg_params, aux_params = mx.model.load_checkpoint(args.model_prefix, args.load_epoch)
@@ -214,7 +227,9 @@ def main():
     args = parse_args()
     
     # Load model
+    print("\nLoading model...")
     model, internal_state, devs = load_model(args)
+    print("Model loaded successfully!")
     
     # Define layers to analyze - now including all trainable layers
     layers_to_analyze = [
@@ -241,9 +256,17 @@ def main():
         ('fc4', (1, 64))                 # Output FC layer
     ]
     
+    total_layers = len(layers_to_analyze)
+    print(f"\nStarting activation maximization for {total_layers} trainable layers...")
+    
     # Perform activation maximization for each layer
-    for layer_name, input_shape in layers_to_analyze:
-        print(f'\nMaximizing activation for layer: {layer_name}')
+    for layer_idx, (layer_name, input_shape) in enumerate(layers_to_analyze, 1):
+        print(f"\n{'='*80}")
+        print(f"Processing layer {layer_idx}/{total_layers}: {layer_name}")
+        print(f"Layer type: {'Convolutional' if 'conv' in layer_name else 'Fully Connected'}")
+        print(f"Input shape: {input_shape}")
+        print(f"{'='*80}")
+        
         input_data, iterations, losses = maximize_activation(
             model, 
             layer_name, 
@@ -254,7 +277,18 @@ def main():
         )
         
         # Visualize the results
+        print(f"\nGenerating visualizations for {layer_name}...")
         visualize_activation(input_data, layer_name, args.output_dir, iterations, losses)
+        print(f"Visualizations saved to {args.output_dir}/{layer_name}_*.png")
+        
+        # Print final loss
+        final_loss = losses[-1]
+        print(f"Final loss for {layer_name}: {final_loss:.4f}")
+    
+    print(f"\n{'='*80}")
+    print("Activation maximization completed for all layers!")
+    print(f"Results saved in: {args.output_dir}")
+    print(f"{'='*80}")
 
 if __name__ == '__main__':
     main() 
