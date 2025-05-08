@@ -111,7 +111,7 @@ def clip_next_config(data):
     
     return clipped
 
-def maximize_activation(model, layer_name, input_shape, num_iterations, learning_rate, devs):
+def maximize_activation(model, layer_name, num_iterations, learning_rate, devs):
     # Initialize random input
     # Handle both CPU and GPU contexts
     if isinstance(devs, list):
@@ -122,29 +122,39 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     # Initialize all three inputs with appropriate shapes
     if 'convolution' in layer_name or 'fullyconnected0' in layer_name:
         # System data branch
-        data1 = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
+        data1 = mx.nd.random.uniform(0, 1, shape=(1, 6, 28, 5), ctx=ctx)
         data2 = mx.nd.zeros((1, 5, 5), ctx=ctx)  # Latency data
         data3 = mx.nd.zeros((1, 28), ctx=ctx)    # Next config data
     elif 'fullyconnected1' in layer_name:
         # Latency data branch
         data1 = mx.nd.zeros((1, 6, 28, 5), ctx=ctx)  # System data
-        data2 = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
+        data2 = mx.nd.random.uniform(0, 1, shape=(1, 5, 5), ctx=ctx)
         data3 = mx.nd.zeros((1, 28), ctx=ctx)    # Next config data
     else:
         # Next config or combined branches
-        data1 = mx.nd.zeros((1, 6, 28, 5), ctx=ctx)  # System data
-        data2 = mx.nd.zeros((1, 5, 5), ctx=ctx)      # Latency data
-        data3 = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
+        data1 = mx.nd.random.uniform(0, 1, shape=(1, 6, 28, 5), ctx=ctx)  # System data
+        data2 = mx.nd.random.uniform(0, 1, shape=(1, 5, 5), ctx=ctx)      # Latency data
+        data3 = mx.nd.random.uniform(0, 1, shape=(1, 28), ctx=ctx)        # Next config data
     
     # Attach gradients to the input we're optimizing
     if 'convolution' in layer_name or 'fullyconnected0' in layer_name:
+        # System data branch
         data1.attach_grad()
         input_data = data1
     elif 'fullyconnected1' in layer_name:
+        # Latency data branch
         data2.attach_grad()
         input_data = data2
-    else:
+    elif 'nxt_fc' in layer_name:
+        # Next config branch
         data3.attach_grad()
+        input_data = data3
+    else:
+        # Combined layers - optimize all inputs
+        data1.attach_grad()
+        data2.attach_grad()
+        data3.attach_grad()
+        # We'll optimize data3 as the primary input, but all will be updated
         input_data = data3
     
     # Get the symbol from the model
@@ -188,12 +198,9 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
             else:
                 raise ValueError(f"Could not find layer {layer_name} or any alternatives")
     
-    # Create a new symbol that includes both the model's output and the target layer's output
-    target_sym = mx.sym.Group([sym, layer_output])
-    
-    # Create a new module for the target layer using the model's symbol
+    # Create a new module for the target layer using just the target layer's output
     target_module = mx.mod.Module(
-        symbol=target_sym,  # Use the combined symbol
+        symbol=layer_output,  # Use just the target layer's output
         context=ctx,
         data_names=['data1', 'data2', 'data3'],
         label_names=None
@@ -226,10 +233,8 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
             # Forward pass through the target layer
             target_module.forward(mx.io.DataBatch([data1, data2, data3]))
             
-            # Get the output of the specific layer we want to maximize
-            # The second output (index 1) is our target layer's output
-            layer_outputs = target_module.get_outputs()
-            target_output = layer_outputs[1]  # The second output is our target layer
+            # Get the output of the target layer
+            target_output = target_module.get_outputs()[0]  # Now it's the first (and only) output
             
             # Compute loss to maximize the mean activation of the target layer
             loss_val = -mx.nd.mean(target_output)
@@ -361,7 +366,6 @@ def main():
         input_data, iterations, losses = maximize_activation(
             model, 
             layer_name, 
-            input_shape, 
             args.num_iterations, 
             args.learning_rate,
             devs
