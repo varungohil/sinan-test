@@ -267,29 +267,29 @@ def main():
     model, internal_state, devs = load_model(args)
     print("Model loaded successfully!")
     
-    # Define layers to analyze - now including all trainable layers
+    # Define layers to analyze - using correct layer names from symbol file
     layers_to_analyze = [
         # System data branch trainable layers
-        ('sys_conv1', (1, 6, 28, 5)),    # First conv layer
-        ('sys_conv2', (1, 16, 28, 5)),   # Second conv layer
-        ('sys_conv3', (1, 16, 28, 5)),   # Third conv layer
-        ('sys_conv4', (1, 16, 28, 5)),   # Fourth conv layer
-        ('sys_conv5', (1, 16, 28, 5)),   # Fifth conv layer
-        ('sys_conv6', (1, 32, 28, 5)),   # Sixth conv layer
-        ('sys_fc', (1, 32)),             # System FC layer
+        ('convolution0_output', (1, 6, 28, 5)),    # First conv layer
+        ('convolution1_output', (1, 16, 28, 5)),   # Second conv layer
+        ('convolution2_output', (1, 16, 28, 5)),   # Third conv layer
+        ('convolution3_output', (1, 16, 28, 5)),   # Fourth conv layer
+        ('convolution4_output', (1, 32, 28, 5)),   # Fifth conv layer
+        ('convolution5_output', (1, 32, 28, 5)),   # Sixth conv layer
+        ('fullyconnected0_output', (1, 32)),       # System FC layer
         
         # Latency data branch trainable layers
-        ('lat_fc1', (1, 5, 5)),          # Latency FC layer
+        ('fullyconnected1_output', (1, 5, 5)),     # Latency FC layer
         
         # Next config branch trainable layers
-        ('nxt_fc', (1, 28)),             # First next config FC layer
-        ('nxt_fc_1', (1, 32)),           # Second next config FC layer
+        ('nxt_fc_output', (1, 28)),                # First next config FC layer
+        ('nxt_fc_1_output', (1, 32)),              # Second next config FC layer
         
         # Combined layers trainable layers
-        ('fc1', (1, 64)),                # First combined FC layer
-        ('fc2', (1, 32)),                # Second combined FC layer
-        ('fc3', (1, 64)),                # Third combined FC layer
-        ('fc4', (1, 64))                 # Output FC layer
+        ('fc1_output', (1, 64)),                   # First combined FC layer
+        ('fc2_output', (1, 32)),                   # Second combined FC layer
+        ('fc3_output', (1, 64)),                   # Third combined FC layer
+        ('fc4_output', (1, 64))                    # Output FC layer
     ]
     
     total_layers = len(layers_to_analyze)
@@ -299,7 +299,7 @@ def main():
     for layer_idx, (layer_name, input_shape) in enumerate(layers_to_analyze, 1):
         print(f"\n{'='*80}")
         print(f"Processing layer {layer_idx}/{total_layers}: {layer_name}")
-        print(f"Layer type: {'Convolutional' if 'conv' in layer_name else 'Fully Connected'}")
+        print(f"Layer type: {'Convolutional' if 'convolution' in layer_name else 'Fully Connected'}")
         print(f"Input shape: {input_shape}")
         print(f"{'='*80}")
         
