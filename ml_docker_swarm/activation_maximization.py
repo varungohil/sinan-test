@@ -188,10 +188,25 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
             else:
                 raise ValueError(f"Could not find layer {layer_name} or any alternatives")
     
+    # Create input symbols
+    data1_sym = mx.sym.Variable('data1')
+    data2_sym = mx.sym.Variable('data2')
+    data3_sym = mx.sym.Variable('data3')
+    
+    # Create a new symbol that connects inputs to the target layer
+    # We need to recreate the path from inputs to the target layer
+    if 'convolution' in layer_name or 'fullyconnected0' in layer_name:
+        # System data branch
+        target_sym = data1_sym
+    elif 'fullyconnected1' in layer_name:
+        # Latency data branch
+        target_sym = data2_sym
+    else:
+        # Next config or combined branches
+        target_sym = data3_sym
+    
     # Create a loss function that maximizes the mean activation
-    # For ReLU layers, we want to maximize the pre-activation values
-    # This helps avoid zero gradients from saturated activations
-    loss = -mx.sym.mean(layer_output)
+    loss = -mx.sym.mean(target_sym)
     
     # Create an optimizer
     optimizer = mx.optimizer.SGD(learning_rate=learning_rate)
@@ -200,11 +215,6 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     # Initialize lists to store iteration and loss values
     iterations = []
     losses = []
-    
-    # Create a new symbol that includes all three inputs
-    data1_sym = mx.sym.Variable('data1')
-    data2_sym = mx.sym.Variable('data2')
-    data3_sym = mx.sym.Variable('data3')
     
     # Create a new module for the target layer
     target_module = mx.mod.Module(
