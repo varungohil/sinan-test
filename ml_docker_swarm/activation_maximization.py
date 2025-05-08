@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument('--kv-store', type=str, default='local', help='the kvstore type')
     parser.add_argument('--output-dir', type=str, default='./activation_maps', help='directory to save activation maps')
     parser.add_argument('--num-iterations', type=int, default=100, help='number of iterations for activation maximization')
-    parser.add_argument('--learning-rate', type=float, default=0.1, help='learning rate for activation maximization')
+    parser.add_argument('--learning-rate', type=float, default=0.01, help='learning rate for activation maximization')
     return parser.parse_args()
 
 def load_model(args):
@@ -122,8 +122,9 @@ def maximize_activation(model, layer_name, input_shape, num_iterations, learning
     input_data = mx.nd.random.uniform(0, 1, shape=input_shape, ctx=ctx)
     input_data.attach_grad()
     
-    # Get both the pre-activation and post-activation outputs
-    all_layers = model.get_internals()
+    # Get the symbol from the model
+    sym = model.symbol
+    all_layers = sym.get_internals()
     
     # For ReLU layers, we want to maximize the pre-activation (before ReLU)
     if 'act' in layer_name:
