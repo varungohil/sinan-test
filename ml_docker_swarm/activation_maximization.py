@@ -198,21 +198,35 @@ def maximize_activation(model, layer_name, num_iterations, learning_rate, devs):
             else:
                 raise ValueError(f"Could not find layer {layer_name} or any alternatives")
     
+    # Determine which inputs are needed for this layer
+    layer_args = layer_output.list_arguments()
+    data_names = []
+    if 'data1' in layer_args:
+        data_names.append('data1')
+    if 'data2' in layer_args:
+        data_names.append('data2')
+    if 'data3' in layer_args:
+        data_names.append('data3')
+    
     # Create a new module for the target layer using just the target layer's output
     target_module = mx.mod.Module(
         symbol=layer_output,  # Use just the target layer's output
         context=ctx,
-        data_names=['data1', 'data2', 'data3'],
+        data_names=data_names,  # Only include the inputs that the layer actually needs
         label_names=None
     )
     
     # Bind the module with the input shapes
+    data_shapes = []
+    if 'data1' in data_names:
+        data_shapes.append(('data1', (1, 6, 28, 5)))
+    if 'data2' in data_names:
+        data_shapes.append(('data2', (1, 5, 5)))
+    if 'data3' in data_names:
+        data_shapes.append(('data3', (1, 28)))
+    
     target_module.bind(
-        data_shapes=[
-            ('data1', (1, 6, 28, 5)),
-            ('data2', (1, 5, 5)),
-            ('data3', (1, 28))
-        ],
+        data_shapes=data_shapes,
         for_training=True
     )
     
