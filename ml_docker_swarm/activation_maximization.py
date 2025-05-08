@@ -201,12 +201,19 @@ def maximize_activation(model, layer_name, num_iterations, learning_rate, devs):
     # Determine which inputs are needed for this layer
     layer_args = layer_output.list_arguments()
     data_names = []
+    data_shapes = []
+    
     if 'data1' in layer_args:
         data_names.append('data1')
+        data_shapes.append(('data1', (1, 6, 28, 5)))
     if 'data2' in layer_args:
         data_names.append('data2')
+        data_shapes.append(('data2', (1, 5, 5)))
     if 'data3' in layer_args:
         data_names.append('data3')
+        data_shapes.append(('data3', (1, 28)))
+    
+    print(f"Layer {layer_name} requires inputs: {data_names}")
     
     # Create a new module for the target layer using just the target layer's output
     target_module = mx.mod.Module(
@@ -217,14 +224,6 @@ def maximize_activation(model, layer_name, num_iterations, learning_rate, devs):
     )
     
     # Bind the module with the input shapes
-    data_shapes = []
-    if 'data1' in data_names:
-        data_shapes.append(('data1', (1, 6, 28, 5)))
-    if 'data2' in data_names:
-        data_shapes.append(('data2', (1, 5, 5)))
-    if 'data3' in data_names:
-        data_shapes.append(('data3', (1, 28)))
-    
     target_module.bind(
         data_shapes=data_shapes,
         for_training=True
@@ -245,7 +244,16 @@ def maximize_activation(model, layer_name, num_iterations, learning_rate, devs):
     for i in range(num_iterations):
         with mx.autograd.record():
             # Forward pass through the target layer
-            target_module.forward(mx.io.DataBatch([data1, data2, data3]))
+            # Only pass the inputs that the layer needs
+            inputs = []
+            if 'data1' in data_names:
+                inputs.append(data1)
+            if 'data2' in data_names:
+                inputs.append(data2)
+            if 'data3' in data_names:
+                inputs.append(data3)
+            
+            target_module.forward(mx.io.DataBatch(inputs))
             
             # Get the output of the target layer
             target_output = target_module.get_outputs()[0]  # Now it's the first (and only) output
